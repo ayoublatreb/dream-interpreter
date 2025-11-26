@@ -3,171 +3,147 @@ import axios from "axios";
 import "./App.css";
 
 function App() {
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
+  const [dream, setDream] = useState("");
+  const [reply, setReply] = useState("");
+  const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
-  const [lang, setLang] = useState("ar-SA");
-  const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [installable, setInstallable] = useState(false); // false par défaut
+  const [voices, setVoices] = useState([]);
+  const [lang, setLang] = useState("ar-MA");
 
-  // 🔹 Charger les voix disponibles
+  // ================================
+  // 🔊 تحميل الأصوات
+  // ================================
   useEffect(() => {
     const loadVoices = () => {
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length) {
-        const darija = voices.find((v) => v.lang === "ar-MA");
+      const v = window.speechSynthesis.getVoices();
+      if (v.length > 0) {
+        setVoices(v);
+        const darija = v.find((x) => x.lang === "ar-MA");
         if (darija) setLang("ar-MA");
-      } else {
-        setTimeout(loadVoices, 200);
+        else setLang("ar-SA");
       }
     };
-
-    window.speechSynthesis.onvoiceschanged = loadVoices;
     loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
 
-  // 🔹 Gérer l'événement "beforeinstallprompt"
-  useEffect(() => {
-    const handler = (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setInstallable(true); // on peut afficher le bouton
-    };
-
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
-  }, []);
-
-  // 🔹 Fonction pour lancer l'installation PWA
-  const handleInstall = async () => {
-    if (!deferredPrompt) return;
-
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-
-    if (outcome === "accepted") {
-      console.log("✅ Application installée !");
-    } else {
-      console.log("❌ Installation annulée.");
-    }
-
-    setDeferredPrompt(null);
-    setInstallable(false);
-  };
-
+  // ================================
+  // 🎤 تسجيل الصوت
+  // ================================
   const startListening = () => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Ton navigateur ne supporte pas la reconnaissance vocale 😢.");
+      alert("المتصفح ديالك ما كيدعمش التعرف على الصوت.");
       return;
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = lang;
+    recognition.lang = "ar-SA";
     recognition.interimResults = false;
 
     recognition.onstart = () => setListening(true);
     recognition.onend = () => setListening(false);
 
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setQuestion(transcript);
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      setDream(transcript);
       askDream(transcript);
     };
 
     recognition.start();
   };
 
-  const askDream = async (q) => {
+  // ================================
+  // 🔗 إرسال الحلم للباك
+  // ================================
+  const askDream = async (text) => {
+    setLoading(true);
+    setReply("");
     try {
-      const res = await axios.post("http://localhost:3001/dream", { question: q });
-      setAnswer(res.data.reply);
+      const res = await axios.post("http://localhost:3001/dream", {
+        question: text,
+      });
+      setReply(res.data.reply);
       speak(res.data.reply);
     } catch (err) {
       console.error(err);
-      setAnswer("❌ Erreur : impossible d'obtenir l'interprétation.");
+      setReply("❌ وقعات شي مشكل، حاول مرة أخرى.");
     }
+    setLoading(false);
   };
 
+  // ================================
+  // 🔊 Text-to-Speech
+  // ================================
   const speak = (text) => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    const voices = window.speechSynthesis.getVoices();
-    let targetVoice = voices.find((v) => v.lang === lang);
-
-    if (!targetVoice && lang === "ar-MA") {
-      targetVoice = voices.find((v) => v.lang === "ar-SA");
-      if (targetVoice) {
-        alert("⚠️ Voix Darija non trouvée, lecture en Arabe classique.");
-      }
-    }
-
-    if (!targetVoice && lang.includes("ar")) {
-      targetVoice = voices.find((v) => v.lang === "fr-FR");
-      alert("⚠️ Aucune voix arabe trouvée. Lecture en français.");
-    }
-
-    if (!targetVoice) {
-      alert("❌ Aucune voix compatible trouvée.");
-      return;
-    }
-
-    utterance.voice = targetVoice;
-    utterance.lang = targetVoice.lang;
-
+    if (!text) return;
+    const utter = new SpeechSynthesisUtterance(text);
+    let voice =
+      voices.find((v) => v.lang === lang) ||
+      voices.find((v) => v.lang === "ar-SA") ||
+      voices.find((v) => v.lang.startsWith("ar")) ||
+      voices[0];
+    if (voice) utter.voice = voice;
     window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+    window.speechSynthesis.speak(utter);
   };
 
-  const testArabicVoice = () => {
-    speak("مرحبا بك، هذا اختبار الصوت.");
-  };
+  const testVoice = () => speak("سلام! هادا اختبار الصوت.");
 
+  // ================================
+  // UI
+  // ================================
   return (
     <div className="app-container">
       <div className="app-box">
-        <h1 className="app-title">🔮 تفسير الأحلام</h1>
+        <h1>🔮 تفسير الأحلام بالدارجة</h1>
 
-        {/* ✅ Bouton d'installation PWA */}
-        {installable && (
-          <button onClick={handleInstall} className="button install">
-            📲 Installer l'application
-          </button>
-        )}
-
+        {/* 🎤 زر الميكروفون */}
         <button
           onClick={startListening}
           disabled={listening}
-          className={`button ${listening ? "listening" : "listen"}`}
+          className={`mic-button ${listening ? "recording" : ""}`}
         >
-          {listening ? "🎙️ En écoute..." : "🎤 إحكي لي عن حلمك"}
+          🎤 {listening ? "كنسجّل..." : "سجّل حلمك"}
         </button>
 
-        <textarea value={question} readOnly rows="3" className="question-box" />
+        {/* مربع النص */}
+        <textarea
+          value={dream}
+          onChange={(e) => setDream(e.target.value)}
+          placeholder="اكتب حلمك هنا أو سجّل بالصوت..."
+          rows={5}
+        />
 
-        <div className="language-select">
-          <label style={{ marginRight: "10px" }}>🔊 Langue de lecture :</label>
-          <select
-            value={lang}
-            onChange={(e) => setLang(e.target.value)}
-            className="language-dropdown"
-          >
-            <option value="ar-SA">Arabe classique</option>
-            <option value="fr-FR">Français</option>
-            <option value="en-US">English</option>
+        {/* زر إرسال */}
+        <button
+          onClick={() => askDream(dream)}
+          disabled={loading || !dream}
+          className="submit-button"
+        >
+          {loading ? "كنفسّر..." : "فسّر ليا الحلم"}
+        </button>
+
+        {/* اختيار الصوت */}
+        <div className="controls-container">
+          <label>🔊 صوت القراءة:</label>
+          <select value={lang} onChange={(e) => setLang(e.target.value)}>
+            <option value="ar-MA">الدارجة المغربية</option>
+            <option value="ar-SA">العربية</option>
           </select>
+          <button onClick={testVoice} className="test-voice-button">
+            🧪 اختبار
+          </button>
         </div>
 
-        <button onClick={testArabicVoice} className="button test">
-          🧪 Tester la voix sélectionnée
-        </button>
-
-        {answer && (
-          <div className="answer-box">
-            <h2 className="answer-title">📖 التفسير :</h2>
-            <p className="answer-text">{answer}</p>
-            <button onClick={() => speak(answer)} className="button speak">
-              🔊 إعادة قراءة الرد
+        {/* التفسير */}
+        {reply && (
+          <div className="reply-container">
+            <h3>📖 التفسير:</h3>
+            <p>{reply}</p>
+            <button onClick={() => speak(reply)} className="replay-button">
+              🔊 إعادة الاستماع
             </button>
           </div>
         )}
