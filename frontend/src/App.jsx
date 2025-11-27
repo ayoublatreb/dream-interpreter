@@ -85,7 +85,7 @@ function App() {
     setLoading(true);
     setReply("");
     try {
-      const res = await axios.post("http://localhost:3001/dream", {
+      const res = await axios.post("/api/dream", {
         question: text,
       });
       setReply(res.data.reply);
