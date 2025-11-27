@@ -17,12 +17,36 @@ const openai = new OpenAI({
 
 const upload = multer({ dest: "uploads/" });
 
-// =======================
+// =========================================
+// 📌 SYSTEM PROMPT النهائي للدارجة المغربية
+// =========================================
+const systemPrompt = `
+إنت مغربي متمكّن ف تفسير لْحْلامْ بحال ابن سيرين والنابلسي.
+كتجاوب غير بالدارجة المغربية العادية، بحال كونك كتهضر مع خوك.
+كل جملة فسططر بوحدها.
+كلام قصير، واضح، وساهل.
+
+ممنوع تستعمل كلمات فصحى، رسمية، أو معقدة.
+ممنوع كلمات بحال: عادة – يمكن – يعني – يدل – إن – فإذا – يجب – خاص.
+
+إيلا لْهَدْرَة ما واضحةش، سول المستخدم باش يزيد يشرح قبل ما تجاوب.
+
+دير تشكيل مغربي باش الصوت يبان طبيعي:
+مثال:
+هاد → هَادْ
+الحلم → لْحَلْمْ
+راه → رَاهْ
+كيبّان → كِيبَّانْ
+
+جاوب بالدارجة فقط وبطريقة سهلة للفهم.
+`;
+
+// =========================================
 // 🎤 تفسير الأحلام من الصوت
-// =======================
+// =========================================
 app.post("/dream-audio", upload.single("audio"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ error: "ما كاينش audio" });
+    if (!req.file) return res.status(400).json({ error: "ما كاينش الصوت" });
 
     const transcription = await openai.audio.transcriptions.create({
       file: fs.createReadStream(req.file.path),
@@ -32,26 +56,14 @@ app.post("/dream-audio", upload.single("audio"), async (req, res) => {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        {
-          role: "system",
-          content: `
-انت مفسر ديال الأحلام بحال ابن سيرين والنابلسي. تجاوب غير بالدارجة المغربية العادية، بحال كنتي كتهضر مع صحابك، بطريقة بسيطة وسهلة.
-كل جملة قصيرة وخليها فسططر بوحدها.
-ممنوع تستعمل أي كلمة فصحى أو رسمية أو معقدة.
-ممنوع كلمات بحال: عادة، يمكن، يعني، يدل على، إن، فإذا، يجب، خاص.
-إيلا النص مش واضح سول المستخدم باش يوضح قبل ما تجاوب.
-ركز على كلام عادي وسهل الفهم.
-          `,
-        },
-        {
-          role: "user",
-          content: transcription.text,
-        },
+        { role: "system", content: systemPrompt },
+        { role: "user", content: transcription.text },
       ],
     });
 
-    let formatted = completion.choices[0].message.content
-      .split(/(?<=[.!?])/)
+    // تقسيم النص على أسطر
+    const formatted = completion.choices[0].message.content
+      .split(/(?<=[.!؟])/)
       .map((s) => s.trim())
       .filter(Boolean)
       .join("\n");
@@ -60,14 +72,14 @@ app.post("/dream-audio", upload.single("audio"), async (req, res) => {
 
     fs.unlinkSync(req.file.path);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
+    console.error("❌ Audio Error:", error);
+    res.status(500).json({ error: "وقع مشكل ف السيرفر" });
   }
 });
 
-// =======================
+// =========================================
 // 📝 تفسير الأحلام من النص
-// =======================
+// =========================================
 app.post("/dream", async (req, res) => {
   try {
     const { question } = req.body;
@@ -75,40 +87,27 @@ app.post("/dream", async (req, res) => {
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        {
-          role: "system",
-          content: `
-انت مفسر ديال الأحلام بحال ابن سيرين والنابلسي. تجاوب غير بالدارجة المغربية العادية، بحال كنتي كتهضر مع صحابك، بطريقة بسيطة وسهلة.
-كل جملة قصيرة وخليها فسططر بوحدها.
-ممنوع تستعمل أي كلمة فصحى أو رسمية أو معقدة.
-ممنوع كلمات بحال: عادة، يمكن، يعني، يدل على، إن، فإذا، يجب، خاص.
-إيلا النص مش واضح سول المستخدم باش يوضح قبل ما تجاوب.
-ركز على كلام عادي وسهل الفهم.
-          `,
-        },
-        {
-          role: "user",
-          content: question,
-        },
+        { role: "system", content: systemPrompt },
+        { role: "user", content: question },
       ],
     });
 
-    let formatted = completion.choices[0].message.content
-      .split(/(?<=[.!?])/)
+    const formatted = completion.choices[0].message.content
+      .split(/(?<=[.!؟])/)
       .map((s) => s.trim())
       .filter(Boolean)
       .join("\n");
 
     res.json({ reply: formatted });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
+    console.error("❌ Text Error:", error);
+    res.status(500).json({ error: "وقع مشكل ف المعالجة" });
   }
 });
 
-// =======================
+// =========================================
 // 🚀 تشغيل السيرفر
-// =======================
+// =========================================
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🚀 Backend running on http://localhost:${PORT}`);

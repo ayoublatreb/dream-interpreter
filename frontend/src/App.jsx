@@ -19,13 +19,37 @@ function App() {
       if (v.length > 0) {
         setVoices(v);
         const darija = v.find((x) => x.lang === "ar-MA");
-        if (darija) setLang("ar-MA");
-        else setLang("ar-SA");
+        setLang(darija ? "ar-MA" : "ar-SA");
       }
     };
     loadVoices();
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }, []);
+
+  // ================================
+  // 📲 PWA Install
+  // ================================
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [installable, setInstallable] = useState(false);
+
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setInstallable(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    setDeferredPrompt(null);
+    setInstallable(false);
+  };
 
   // ================================
   // 🎤 تسجيل الصوت
@@ -74,14 +98,31 @@ function App() {
   };
 
   // ================================
-  // 🔊 Text-to-Speech
+  // 🔊 Text-to-Speech مع تشكيل مغربي
   // ================================
   const speak = (text) => {
     if (!text) return;
-    const utter = new SpeechSynthesisUtterance(text);
-    let voice =
+    const tashkil = (txt) =>
+      txt
+        .replace(/\bهاد\b/g, "هَادْ")
+        .replace(/\bالحلم\b/g, "لْحَلْمْ")
+        .replace(/\bراه\b/g, "رَاهْ")
+        .replace(/\bكيبّان\b/g, "كِيبَّانْ")
+        .replace(/\bكنت\b/g, "كُنتْ")
+        .replace(/\bكت\b/g, "كِتْ")
+        .replace(/\bمع\b/g, "مَعَ")
+        .replace(/\bفوق\b/g, "فُوقْ")
+        .replace(/\bالصحراء\b/g, "لصَّحْرَاءْ")
+        .replace(/\bالجمل\b/g, "لْجَمَلْ")
+        .replace(/\bممكن\b/g, "مُمكِنْ")
+        .replace(/\bشوي\b/g, "شْوَيَّةْ")
+        .replace(/\bحاجة\b/g, "حَاجَةْ")
+        .replace(/\bكتحس\b/g, "كِتْحِسْ")
+        .replace(/\bتحاول\b/g, "تْحَاوْلْ")
+        .replace(/\bتبحث\b/g, "تْبْحَثْ");
+    const utter = new SpeechSynthesisUtterance(tashkil(text));
+    const voice =
       voices.find((v) => v.lang === lang) ||
-      voices.find((v) => v.lang === "ar-SA") ||
       voices.find((v) => v.lang.startsWith("ar")) ||
       voices[0];
     if (voice) utter.voice = voice;
@@ -98,6 +139,13 @@ function App() {
     <div className="app-container">
       <div className="app-box">
         <h1>🔮 تفسير الأحلام بالدارجة</h1>
+
+        {/* زر التثبيت */}
+        {installable && (
+          <button onClick={handleInstall} className="install-button">
+            📲 تثبيت التطبيق
+          </button>
+        )}
 
         {/* 🎤 زر الميكروفون */}
         <button
