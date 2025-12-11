@@ -120,7 +120,7 @@ export default function DreamInterpreterApp() {
     setReply("");
 
     try {
-      const res = await axios.post("http://localhost:3001/dream", { question: text });
+      const res = await axios.post("/api/dream", { question: text });
       setReply(res.data.reply);
       speak(res.data.reply);
 
