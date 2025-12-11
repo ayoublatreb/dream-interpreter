@@ -136,12 +136,7 @@ export default function DreamInterpreterApp() {
   return (
     <div className="container">
 
-      {/* 🔥 شعار أعلى اليمين خارج البطاقة */}
-      <div className="dream-logo">
-        <span className="dream-icon">🌓</span>
-        <span className="dream-text">مفسّر الأحلام</span>
-      </div>
-
+     
       <div className="card">
 
         {mode === "record" && (

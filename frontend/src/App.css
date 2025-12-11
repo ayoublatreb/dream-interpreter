@@ -172,3 +172,42 @@ button:disabled {
   background-color: #f39c12;
   color: white;
 }
+/* 🔥 شعار مفسّر الأحلام — أقصى اليمين */
+.dream-logo {
+  position: fixed;
+  top: 18px;
+  right: 18px; /* أقصى اليمين */
+  z-index: 9999;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  background: rgba(255, 255, 255, 0.08);
+  padding: 8px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 4px 18px rgba(0,0,0,0.25);
+
+  opacity: 0;
+  animation: slideFadeIn 0.9s forwards ease-out;
+}
+
+/* حركة ظهور ناعمة */
+@keyframes slideFadeIn {
+  0% { transform: translateY(-14px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+/* 👇 هنا الكود الذي طلبته بالضبط */
+.dream-icon {
+  font-size: 22px; /* رفعتها قليلاً لتظهر أوضح */
+}
+
+.dream-text {
+  font-size: 19px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.4px;
+}
