@@ -7,9 +7,14 @@ export default function DreamInterpreterApp() {
   const [dream, setDream] = useState("");
   const [reply, setReply] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // 🔹 PWA
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [installable, setInstallable] = useState(false);
+
   const recognitionRef = useRef(null);
 
-  // Inject CSS
+  /* ================= CSS (كما هو) ================= */
   useEffect(() => {
     const css = `
     :root{ --bg1:#0e0760; --bg2:#4a0f7a; --accent:#00c2ff; }
@@ -18,27 +23,6 @@ export default function DreamInterpreterApp() {
     body{margin:0;font-family:"Cairo";background:linear-gradient(135deg,var(--bg1),var(--bg2));display:flex;align-items:center;justify-content:center;direction:rtl}
 
     .container{width:100%;max-width:900px;padding:28px;position:relative}
-
-    /* 🔥 شعار خارج البطاقة */
-    .dream-logo {
-      position: absolute;
-      top: 0px;
-      right: 0px;
-      transform: translate(50%, -50%);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-
-      background: rgba(255, 255, 255, 0.08);
-      padding: 8px 14px;
-      border-radius: 14px;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      backdrop-filter: blur(6px);
-      box-shadow: 0 4px 18px rgba(0,0,0,0.3);
-    }
-
-    .dream-icon { font-size: 20px; }
-    .dream-text { font-size: 18px; font-weight: 800; color: #fff; letter-spacing: .3px; }
 
     .card{background:rgba(255,255,255,0.04);padding:36px;border-radius:18px;color:#fff;box-shadow:0 18px 60px rgba(0,0,0,0.45);position:relative;margin-top:30px;}
 
@@ -73,7 +57,26 @@ export default function DreamInterpreterApp() {
     }
   }, []);
 
-  // Start recording
+  /* ================= PWA ================= */
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setInstallable(true);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    setDeferredPrompt(null);
+    setInstallable(false);
+  };
+
+  /* ================= Voice ================= */
   const startListening = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return alert("المتصفح لا يدعم التعرف على الصوت");
@@ -84,62 +87,68 @@ export default function DreamInterpreterApp() {
     rec.interimResults = false;
 
     rec.onstart = () => setListening(true);
-
-    rec.onresult = (e) => {
-      const text = e.results[0][0].transcript;
-      setDream(text);
-    };
+    rec.onresult = (e) => setDream(e.results[0][0].transcript);
 
     rec.start();
   };
 
-  // Stop + interpret only after user presses "اضغط للإنهاء"
   const stopRecognition = () => {
     recognitionRef.current?.stop();
     setListening(false);
-
     if (!dream.trim()) return;
-
     setMode("explain");
     askDream(dream);
   };
 
-
-
-  
-  // TTS
   const speak = (text) => {
     if (!text) return;
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.lang = "ar-SA";
-    utter.rate = 1;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utter);
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "ar-SA";
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
   };
 
-  // Ask backend
   const askDream = async (text) => {
     setLoading(true);
     setReply("");
-
     try {
-      const res = await axios.post("/api/dream", { question: text });
+      const res = await axios.post("http://localhost:3001/dream", { question: text });
       setReply(res.data.reply);
       speak(res.data.reply);
-
     } catch {
       const fallback = "تفسير عام: يبدو أن حلمك مرتبط بمشاعر داخلية.";
       setReply(fallback);
       speak(fallback);
     }
-
     setLoading(false);
   };
 
   return (
     <div className="container">
 
-     
+      {/* 🔹 زر تثبيت التطبيق (PWA فقط) */}
+      {installable && (
+        <button
+          onClick={handleInstall}
+          style={{
+            position: "fixed",
+            bottom: "20px",
+            left: "20px",
+            zIndex: 9999,
+            padding: "10px 14px",
+            borderRadius: "12px",
+            border: "none",
+            fontWeight: "700",
+            cursor: "pointer",
+            background: "#00c2ff",
+            color: "#012",
+            boxShadow: "0 6px 20px rgba(0,0,0,.35)"
+          }}
+        >
+          📲 تثبيت التطبيق
+        </button>
+      )}
+
       <div className="card">
 
         {mode === "record" && (
@@ -152,14 +161,13 @@ export default function DreamInterpreterApp() {
                 className={`mic-circle ${listening ? "recording" : ""}`}
                 onClick={() => (listening ? stopRecognition() : startListening())}
               >
-                <div className="mic-icon">
-                  <svg width="70" height="70" viewBox="0 0 24 24" fill="#FFD54F">
-                    <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/>
-                    <path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-3.08A7 7 0 0 0 19 11z"/>
-                  </svg>
-                  <div className="finger">☝️</div>
-                </div>
-
+                  <div className="mic-icon">
+    <svg width="70" height="70" viewBox="0 0 24 24" fill="#FFD54F">
+      <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/>
+      <path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-3.08A7 7 0 0 0 19 11z"/>
+    </svg>
+    <div className="finger">☝️</div>
+  </div>
                 <div className="mic-label">
                   {listening ? "اضغط للإنهاء" : "اضغط للتسجيل"}
                 </div>
@@ -194,7 +202,7 @@ export default function DreamInterpreterApp() {
             <div className="title">التفسير الصوتي</div>
 
             <div className="explain-circle">
-              <div className="stop-square" onClick={() => window.speechSynthesis.cancel()}>
+              <div className="stop-square" onClick={() => speechSynthesis.cancel()}>
                 ⏹
               </div>
             </div>
@@ -208,7 +216,7 @@ export default function DreamInterpreterApp() {
             <button
               className="btn btn-ghost"
               onClick={() => {
-                window.speechSynthesis.cancel();
+                speechSynthesis.cancel();
                 setMode("record");
                 setReply("");
               }}
