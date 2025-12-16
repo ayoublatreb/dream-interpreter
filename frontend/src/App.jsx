@@ -104,6 +104,9 @@ export default function DreamInterpreterApp() {
     askDream(dream);
   };
 
+
+
+  
   // TTS
   const speak = (text) => {
     if (!text) return;
