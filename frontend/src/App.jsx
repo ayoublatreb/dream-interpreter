@@ -7,12 +7,14 @@ export default function DreamInterpreterApp() {
   const [dream, setDream] = useState("");
   const [reply, setReply] = useState("");
   const [loading, setLoading] = useState(false);
+  const [audioUrl, setAudioUrl] = useState(""); // For download/share
 
   // 🔹 PWA
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [installable, setInstallable] = useState(false);
 
   const recognitionRef = useRef(null);
+  const audioRef = useRef(null); // 🔹 لإدارة الصوت
 
   /* ================= CSS (كما هو) ================= */
   useEffect(() => {
@@ -68,6 +70,20 @@ export default function DreamInterpreterApp() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
+  const handleShare = async () => {
+    if (navigator.share && audioUrl) {
+      try {
+        await navigator.share({
+          title: 'تفسير حلمي',
+          text: 'استمع إلى تفسير حلمي الصوتي:',
+          url: audioUrl,
+        });
+      } catch (error) {
+        console.error('Error sharing:', error);
+      }
+    }
+  };
+
   const handleInstall = async () => {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
@@ -100,19 +116,33 @@ export default function DreamInterpreterApp() {
     askDream(dream);
   };
 
-  const speak = (text) => {
+  const speak = async (text) => {
     if (!text) return;
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "ar-SA";
-    speechSynthesis.cancel();
-    speechSynthesis.speak(u);
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+
+    try {
+      // 🔹 طلب الصوت من الخادم
+      const response = await axios.post("http://localhost:3001/tts", { text });
+      const { audioUrl } = response.data;
+      setAudioUrl(audioUrl); // Save URL for download/share
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      audio.play();
+    } catch (error) {
+      console.error("Error fetching TTS audio:", error);
+      alert("حدث خطأ أثناء تجهيز الصوت.");
+    }
   };
 
   const askDream = async (text) => {
     setLoading(true);
     setReply("");
+    setAudioUrl(""); // Reset audio URL
     try {
-      const res = await axios.post("/api/dream", { question: text });
+      const res = await axios.post("http://localhost:3001/dream", { question: text });
       setReply(res.data.reply);
       speak(res.data.reply);
     } catch {
@@ -202,26 +232,40 @@ export default function DreamInterpreterApp() {
             <div className="title">التفسير الصوتي</div>
 
             <div className="explain-circle">
-              <div className="stop-square" onClick={() => speechSynthesis.cancel()}>
+              <div className="stop-square" onClick={() => audioRef.current?.pause()}>
                 ⏹
               </div>
             </div>
 
             <div className="reply-box">{reply || "جارٍ تجهيز التفسير..."}</div>
 
-            <button className="btn btn-primary" onClick={() => speak(reply)}>
+            <button className="btn btn-primary" onClick={() => audioRef.current?.play()}>
               🔊 إعادة الاستماع
             </button>
+
+            {audioUrl && (
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '10px' }}>
+                <a href={audioUrl} download="interpretation.mp3" className="btn btn-ghost" style={{ textDecoration: 'none' }}>
+                  📥 تحميل الصوت
+                </a>
+                {navigator.share && (
+                  <button className="btn btn-ghost" onClick={handleShare}>
+                    🔗 مشاركة
+                  </button>
+                )}
+              </div>
+            )}
 
             <button
               className="btn btn-ghost"
               onClick={() => {
-                speechSynthesis.cancel();
+                audioRef.current?.pause();
                 setMode("record");
                 setReply("");
+                setAudioUrl(""); // Reset audio URL
               }}
             >
-              رجوع
+              حلم جديد
             </button>
           </>
         )}
