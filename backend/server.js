@@ -2,9 +2,8 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import OpenAI from "openai";
+import multer from "multer";
 import fs from "fs";
-import path from "path";
-import { fileURLToPath } from 'url';
 
 dotenv.config();
 
@@ -12,112 +11,124 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = process.env.PORT || 3001;
+const upload = multer({ storage: multer.memoryStorage() });
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Create audio directory if it doesn't exist
-const audioDir = path.join(__dirname, 'audio');
-if (!fs.existsSync(audioDir)) {
-  fs.mkdirSync(audioDir);
-}
-
-app.use('/audio', express.static(audioDir));
-
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// ===============================
-// System Prompt (ابن سيرين + النابلسي)
-// ===============================
+// System prompt فقط لـ GPT
 const systemPrompt = `
 أنت خبير في تفسير الأحلام على منهج ابن سيرين والنابلسي.
-
-مهمتك تمر عبر مرحلتين:
-
-المرحلة الأولى:
-فهم الكلام مهما كانت لهجته العربية (مغربية، مصرية، خليجية، شامية).
-حوّل الكلام إلى العربية الفصحى في ذهنك دون إظهار ذلك للمستخدم.
-
-المرحلة الثانية:
-إذا كان الكلام حلمًا واضحًا، قم بتفسيره تفسيرًا شرعيًا مبسطًا.
-إذا لم يكن حلمًا، أو كان كلامًا عاديًا، أو غير واضح، قل:
-"لم أستطع تحديد حلم واضح لتفسيره."
-اكتب التفسير بأسلوب بسيط،
-بجمل قصيرة،
-وبنبرة هادئة ومطمئنة،
-ليُقرأ صوتيًا وكأنه إنسان حقيقي.
-قواعد:
-- لا تجب إلا على الأحلام.
-- لا تفسّر الأسئلة أو القصص غير المتعلقة بالأحلام.
-- لا تطلب معلومات إضافية.
-- لا تخرج عن دور مفسر الأحلام.
+افهم جميع اللهجات العربية (مغربية، مصرية، خليجية، شامية…).
+رد بالعربية الفصحى، مختصر، نبرة هادئة وهادية.
+صوت رجل هادئ وحكيم
+إذا الكلام ليس حلم واضح، قل: "لم أستطع تحديد حلم واضح لتفسيره."
 `;
 
-// ===============================
-// تفسير الحلم (نص)
-// ===============================
-app.post("/dream", async (req, res) => {
-  try {
-    const { question } = req.body;
+// تحويل الصوت لنص
+async function transcribeAudio(buffer, originalName) {
+  const tempPath = `./temp-${Date.now()}-${originalName}`;
+  fs.writeFileSync(tempPath, buffer);
 
-    if (!question || !question.trim()) {
-      return res.status(400).json({ error: "النص فارغ" });
+  const transcription = await client.audio.transcriptions.create({
+    file: fs.createReadStream(tempPath),
+    model: "whisper-1",
+    language: "ar"
+  });
+
+  fs.unlinkSync(tempPath);
+  return transcription.text;
+}
+
+// Endpoint for audio
+app.post("/dream-audio", upload.single("audio"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "لم يتم إرسال ملف صوتي" });
+
+    // 1️⃣ تحويل الصوت لنص
+    const userText = await transcribeAudio(req.file.buffer, req.file.originalname);
+
+    if (!userText || userText.trim().length < 2) {
+      return res.json({
+        inputText: userText,
+        replyText: "لم أسمع شيئاً واضحاً. الرجاء المحاولة مرة أخرى.",
+        audioBase64: null
+      });
     }
 
-    const response = await client.responses.create({
-      model: "gpt-4.1-mini",
-      input: [
+    // 2️⃣ GPT: تفسير الحلم فقط
+    const gptResponse = await client.chat.completions.create({
+      model: "gpt-4-turbo",
+      messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: question },
+        { role: "user", content: userText }
       ],
+      temperature: 0.7
     });
 
-    const reply =
-      response.output_text?.trim() || "لم يتم التعرف على حلم واضح.";
+    const replyText = gptResponse.choices[0].message.content.trim();
 
-    res.json({ reply });
-  } catch (error) {
-    console.error("❌ Backend Error:", error);
-    res.status(500).json({ error: "حدث خطأ في الخادم" });
+    // 3️⃣ TTS: فقط الرد النهائي، بدون أي تعليمات إضافية
+    const ttsResponse = await client.audio.speech.create({
+      model: "gpt-4o-mini-tts",
+      voice: "alloy", // صوت رجل هادئ وحكيم
+      input: replyText,
+      language: "ar"
+    });
+
+    const bufferTTS = Buffer.from(await ttsResponse.arrayBuffer());
+    const audioBase64 = bufferTTS.toString("base64");
+
+    res.json({ inputText: userText, replyText, audioBase64 });
+
+  } catch (err) {
+    console.error("❌ Error processing dream:", err);
+    res.status(500).json({ error: "حدث خطأ أثناء المعالجة" });
   }
 });
 
-// ===============================
-// Text-to-Speech (صوت)
-// ===============================
-app.post("/tts", async (req, res) => {
+// Endpoint for text
+app.post("/dream-text", async (req, res) => {
   try {
     const { text } = req.body;
-    if (!text) {
-      return res.status(400).json({ error: "النص فارغ" });
+    if (!text || text.trim().length < 2) {
+      return res.json({
+        inputText: text,
+        replyText: "لم أستطع تحديد حلم واضح لتفسيره.",
+        audioBase64: null
+      });
     }
 
-    const mp3 = await client.audio.speech.create({
-      model: "tts-1",
-      voice: "nova",
-      input: text,
+    // GPT: تفسير الحلم فقط
+    const gptResponse = await client.chat.completions.create({
+      model: "gpt-4-turbo",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: text }
+      ],
+      temperature: 0.7
     });
 
-    const buffer = Buffer.from(await mp3.arrayBuffer());
-    const speechFile = path.join(audioDir, `${Date.now()}.mp3`);
-    
-    await fs.promises.writeFile(speechFile, buffer);
+    const replyText = gptResponse.choices[0].message.content.trim();
 
-    const audioUrl = `http://localhost:${PORT}/audio/${path.basename(speechFile)}`;
-    res.json({ audioUrl });
+    // TTS: فقط الرد النهائي
+    const ttsResponse = await client.audio.speech.create({
+      model: "gpt-4o-mini-tts",
+      voice: "alloy",
+      input: replyText,
+      language: "ar"
+    });
 
-  } catch (error) {
-    console.error("❌ TTS Error:", error);
-    res.status(500).json({ error: "حدث خطأ في تحويل النص إلى كلام" });
+    const bufferTTS = Buffer.from(await ttsResponse.arrayBuffer());
+    const audioBase64 = bufferTTS.toString("base64");
+
+    res.json({ inputText: text, replyText, audioBase64 });
+
+  } catch (err) {
+    console.error("❌ Error processing dream text:", err);
+    res.status(500).json({ error: "حدث خطأ أثناء المعالجة" });
   }
 });
 
-// ===============================
-// تشغيل الخادم
-// ===============================
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });

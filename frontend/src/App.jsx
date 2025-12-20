@@ -2,272 +2,382 @@ import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 
 export default function DreamInterpreterApp() {
-  const [mode, setMode] = useState("record");
-  const [listening, setListening] = useState(false);
-  const [dream, setDream] = useState("");
-  const [reply, setReply] = useState("");
+  const [mode, setMode] = useState("record"); // record | explain | text
+  const [recording, setRecording] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [audioUrl, setAudioUrl] = useState(""); // For download/share
-
-  // 🔹 PWA
   const [deferredPrompt, setDeferredPrompt] = useState(null);
-  const [installable, setInstallable] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
 
-  const recognitionRef = useRef(null);
-  const audioRef = useRef(null); // 🔹 لإدارة الصوت
+  // Data
+  const [dreamText, setDreamText] = useState("");
+  const [replyText, setReplyText] = useState("");
+  const [audioSrc, setAudioSrc] = useState(null);
+  const [manualText, setManualText] = useState("");
 
-  /* ================= CSS (كما هو) ================= */
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
+  /* ================= CSS Styles ================= */
   useEffect(() => {
     const css = `
-    :root{ --bg1:#0e0760; --bg2:#4a0f7a; --accent:#00c2ff; }
-    *{box-sizing:border-box}
-    html,body,#root{height:100%}
-    body{margin:0;font-family:"Cairo";background:linear-gradient(135deg,var(--bg1),var(--bg2));display:flex;align-items:center;justify-content:center;direction:rtl}
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;800&display=swap');
 
-    .container{width:100%;max-width:900px;padding:28px;position:relative}
+    :root {
+      --bg-deep: #0f0c29;
+      --bg-mid: #302b63;
+      --bg-light: #24243e;
+      --accent-gold: #ffd700;
+      --accent-cyan: #00d2ff;
+      --text-main: #ffffff;
+      --text-sub: #e0e0e0;
+      --glass-bg: rgba(255, 255, 255, 0.05);
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
 
-    .card{background:rgba(255,255,255,0.04);padding:36px;border-radius:18px;color:#fff;box-shadow:0 18px 60px rgba(0,0,0,0.45);position:relative;margin-top:30px;}
+    * { box-sizing: border-box; }
 
-    .title{text-align:center;font-size:32px;font-weight:800;margin-top:10px}
-    .subtitle{text-align:center;color:#ddd;margin-top:6px}
+    body {
+      margin: 0;
+      font-family: 'Cairo', sans-serif;
+      background: linear-gradient(135deg, var(--bg-deep), var(--bg-mid), var(--bg-light));
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      direction: rtl;
+      overflow-x: hidden;
+      color: var(--text-main);
+    }
 
-    .mic-wrap{display:flex;flex-direction:column;align-items:center;margin-top:22px}
-    .mic-circle{width:220px;height:220px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.03);border:6px solid rgba(255,255,255,0.12);cursor:pointer;transition:0.2s;position:relative}
-    .mic-circle.recording{animation:pulse 1.4s infinite;border-color:red}
-    @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.07)}100%{transform:scale(1)}}
+    /* Particles / Stars Background */
+    body::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      background-image: radial-gradient(white 1px, transparent 1px);
+      background-size: 50px 50px; opacity: 0.1; z-index: -2;
+    }
 
-    .mic-icon{position:relative;}
-    .finger{position:absolute;bottom:-26px;left:50%;transform:translateX(-50%);font-size:24px;}
-    .mic-label{position:absolute;bottom:16px;font-size:16px;color:#fff}
+    /* Ambient Glow */
+    body::after {
+      content: ''; position: absolute; bottom: -10%; right: -10%; width: 400px; height: 400px;
+      background: radial-gradient(circle, rgba(255, 215, 0, 0.08), transparent 70%);
+      border-radius: 50%;
+      animation: float 15s ease-in-out infinite reverse;
+      z-index: -1;
+    }
+    @keyframes float { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(20px, 30px); } }
 
-    textarea{width:100%;min-height:80px;margin-top:18px;background:#00000022;color:#fff;padding:12px;border-radius:12px;border:none;}
+    .container { width: 100%; max-width: 600px; padding: 20px; position: relative; z-index: 1; }
 
-    .btn{padding:10px 14px;margin-top:12px;border-radius:10px;border:none;font-weight:700;cursor:pointer}
-    .btn-primary{background:linear-gradient(90deg,var(--accent), #007bb5);color:#012}
-    .btn-ghost{background:transparent;border:1px solid #fff3;color:#fff}
+    .card {
+      background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border); border-radius: 24px; padding: 40px 30px;
+      box-shadow: var(--glass-shadow); text-align: center; transition: all 0.3s ease;
+    }
 
-    .explain-circle{width:200px;height:200px;border-radius:50%;border:6px solid #00c2ff88;margin:20px auto;display:flex;align-items:center;justify-content:center;position:relative}
-    .stop-square{width:60px;height:60px;background:#00c2ff;color:#012;border-radius:10px;font-size:24px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+    .title {
+      font-size: 36px; font-weight: 800;
+      background: linear-gradient(to bottom, #fff, #aaa); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+    .subtitle { font-size: 16px; color: var(--accent-cyan); letter-spacing: 0.5px; margin-bottom: 20px; font-weight: 600; }
 
-    .reply-box{background:#0005;padding:16px;border-radius:12px;margin-top:16px;font-size:17px;line-height:1.7}
+    /* Visualizer Bars */
+    .visualizer { display: flex; align-items: center; justify-content: center; height: 40px; margin-top: 20px; gap: 4px; }
+    .bar { width: 6px; background: var(--accent-cyan); border-radius: 4px; animation: wave 1s ease-in-out infinite; }
+    .bar:nth-child(odd) { background: var(--accent-gold); }
+    @keyframes wave { 0%, 100% { height: 10px; } 50% { height: 35px; } }
+    
+    /* Mic */
+    .mic-wrap { position: relative; display: flex; justify-content: center; margin: 30px auto; }
+    .mic-circle {
+      width: 140px; height: 140px; border-radius: 50%;
+      background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(0,0,0,0.2));
+      display: flex; align-items: center; justify-content: center; font-size: 50px;
+      color: var(--text-main); border: 1px solid rgba(255,255,255,0.1); cursor: pointer; transition: 0.3s; z-index: 2;
+    }
+    .mic-circle:hover { transform: scale(1.05); border-color: var(--accent-cyan); }
+    .mic-circle.recording { color: #ff4d4d; border-color: #ff4d4d; }
+
+    .pulse-ring {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 140px; height: 140px; border-radius: 50%; border: 2px solid var(--accent-cyan); opacity: 0; pointer-events: none;
+    }
+    .recording .pulse-ring { animation: pulse-ring-anim 2s infinite; }
+    @keyframes pulse-ring-anim { 0% { width: 140px; height: 140px; opacity: 0.8; } 100% { width: 280px; height: 280px; opacity: 0; } }
+
+    /* Response */
+    .reply-box {
+      margin-top: 30px; padding: 25px; background: rgba(0,0,0,0.2);
+      border-radius: 20px; border-right: 4px solid var(--accent-gold);
+      text-align: justify; line-height: 1.8; font-size: 17px;
+    }
+    .dream-quote { font-size: 14px; opacity: 0.6; font-style: italic; margin-top: 15px; }
+
+    /* Buttons */
+    .btn { padding: 14px 28px; border-radius: 50px; border: none; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 20px; }
+    .btn-primary { background: linear-gradient(90deg, var(--accent-cyan), #3a7bd5); color: #fff; box-shadow: 0 4px 15px rgba(0, 210, 255, 0.4); }
+    .btn-ghost { background: transparent; border: 1px solid var(--glass-border); color: var(--text-sub); }
+
+    /* Animations */
+    .fade-in { animation: fadeIn 0.8s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+    .spin { animation: spin 1s linear infinite; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
     `;
     if (!document.getElementById("styles")) {
       const s = document.createElement("style");
-      s.id = "styles";
-      s.innerHTML = css;
-      document.head.appendChild(s);
+      s.id = "styles"; s.innerHTML = css; document.head.appendChild(s);
     }
   }, []);
 
-  /* ================= PWA ================= */
+  /* ================= PWA Install ================= */
   useEffect(() => {
-    const handler = (e) => {
+    const checkInstalled = () => {
+      const standalone = window.matchMedia('(display-mode: standalone)').matches;
+      setIsInstalled(standalone);
+    };
+
+    checkInstalled();
+
+    const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      setInstallable(true);
     };
-    window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+
+    const handleDisplayModeChange = () => {
+      checkInstalled();
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.matchMedia('(display-mode: standalone)').addListener(handleDisplayModeChange);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.matchMedia('(display-mode: standalone)').removeListener(handleDisplayModeChange);
+    };
   }, []);
 
-  const handleShare = async () => {
-    if (navigator.share && audioUrl) {
-      try {
-        await navigator.share({
-          title: 'تفسير حلمي',
-          text: 'استمع إلى تفسير حلمي الصوتي:',
-          url: audioUrl,
+  /* ================= Service Worker ================= */
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then((registration) => {
+          console.log('Service Worker registered:', registration);
+        })
+        .catch((error) => {
+          console.log('Service Worker registration failed:', error);
         });
-      } catch (error) {
-        console.error('Error sharing:', error);
-      }
     }
-  };
+  }, []);
 
-  const handleInstall = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
-    setInstallable(false);
-  };
+  /* ================= Logic ================= */
 
-  /* ================= Voice ================= */
-  const startListening = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return alert("المتصفح لا يدعم التعرف على الصوت");
-
-    const rec = new SR();
-    recognitionRef.current = rec;
-    rec.lang = "ar-SA";
-    rec.interimResults = false;
-
-    rec.onstart = () => setListening(true);
-    rec.onresult = (e) => setDream(e.results[0][0].transcript);
-
-    rec.start();
-  };
-
-  const stopRecognition = () => {
-    recognitionRef.current?.stop();
-    setListening(false);
-    if (!dream.trim()) return;
-    setMode("explain");
-    askDream(dream);
-  };
-
-  const speak = async (text) => {
-    if (!text) return;
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
-
+  const startRecording = async () => {
     try {
-      // 🔹 طلب الصوت من الخادم
-      const response = await axios.post("http://localhost:3001/tts", { text });
-      const { audioUrl } = response.data;
-      setAudioUrl(audioUrl); // Save URL for download/share
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-      audio.play();
-    } catch (error) {
-      console.error("Error fetching TTS audio:", error);
-      alert("حدث خطأ أثناء تجهيز الصوت.");
-    }
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      mediaRecorderRef.current = rec;
+      audioChunksRef.current = [];
+      rec.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      rec.start();
+      setRecording(true);
+    } catch { alert("الميكروفون غير متاح"); }
   };
 
-  const askDream = async (text) => {
+  const stopRecording = () => {
+    if (!mediaRecorderRef.current) return;
+    mediaRecorderRef.current.stop();
+    setRecording(false);
+    mediaRecorderRef.current.onstop = () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      handleUpload(audioBlob);
+    };
+  };
+
+  const handleUpload = async (audioBlob) => {
     setLoading(true);
-    setReply("");
-    setAudioUrl(""); // Reset audio URL
+    setMode("explain");
+    setReplyText("");
+    setDreamText("");
+    setAudioSrc(null);
+
+    const formData = new FormData();
+    formData.append("audio", audioBlob, "recording.webm");
+
     try {
-      const res = await axios.post("http://localhost:3001/dream", { question: text });
-      setReply(res.data.reply);
-      speak(res.data.reply);
+      const res = await axios.post("http://localhost:3001/dream-audio", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      const { inputText, replyText, audioBase64 } = res.data;
+      setDreamText(inputText);
+      setReplyText(replyText);
+      if (audioBase64) setAudioSrc(`data:audio/mp3;base64,${audioBase64}`);
     } catch {
-      const fallback = "تفسير عام: يبدو أن حلمك مرتبط بمشاعر داخلية.";
-      setReply(fallback);
-      speak(fallback);
+      setReplyText("حدث خطأ في الاتصال.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
+  };
+
+  const handleSubmitText = async () => {
+    if (!manualText.trim()) {
+      alert("يرجى كتابة الحلم أولاً.");
+      return;
+    }
+    setLoading(true);
+    setMode("explain");
+    setReplyText("");
+    setDreamText("");
+
+    try {
+      const res = await axios.post("http://localhost:3001/dream-text", { text: manualText });
+      const { inputText, replyText, audioBase64 } = res.data;
+      setDreamText(inputText);
+      setReplyText(replyText);
+      if (audioBase64) setAudioSrc(`data:audio/mp3;base64,${audioBase64}`);
+    } catch {
+      setReplyText("حدث خطأ في الاتصال.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInstall = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('User accepted the install prompt');
+        } else {
+          console.log('User dismissed the install prompt');
+        }
+        setDeferredPrompt(null);
+      });
+    } else {
+      alert('التطبيق غير متاح للتثبيت حالياً. يرجى المحاولة لاحقاً.');
+    }
   };
 
   return (
     <div className="container">
+      <div className="card fade-in">
 
-      {/* 🔹 زر تثبيت التطبيق (PWA فقط) */}
-      {installable && (
-        <button
-          onClick={handleInstall}
-          style={{
-            position: "fixed",
-            bottom: "20px",
-            left: "20px",
-            zIndex: 9999,
-            padding: "10px 14px",
-            borderRadius: "12px",
-            border: "none",
-            fontWeight: "700",
-            cursor: "pointer",
-            background: "#00c2ff",
-            color: "#012",
-            boxShadow: "0 6px 20px rgba(0,0,0,.35)"
-          }}
-        >
-          📲 تثبيت التطبيق
-        </button>
-      )}
+        <div className="title">مفسر الأحلام</div>
+        <div className="subtitle"></div>
 
-      <div className="card">
-
+        {/* === Record Mode === */}
         {mode === "record" && (
-          <>
-            <div className="title">احكِ حلمك</div>
-            <div className="subtitle">سجّل حلمك أو اكتبه ثم اضغط للتفسير</div>
-
-            <div className="mic-wrap">
-              <div
-                className={`mic-circle ${listening ? "recording" : ""}`}
-                onClick={() => (listening ? stopRecognition() : startListening())}
-              >
-                  <div className="mic-icon">
-    <svg width="70" height="70" viewBox="0 0 24 24" fill="#FFD54F">
-      <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3z"/>
-      <path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-3.08A7 7 0 0 0 19 11z"/>
-    </svg>
-    <div className="finger">☝️</div>
-  </div>
-                <div className="mic-label">
-                  {listening ? "اضغط للإنهاء" : "اضغط للتسجيل"}
-                </div>
-              </div>
-
-              <textarea
-                value={dream}
-                onChange={(e) => setDream(e.target.value)}
-                placeholder="اكتب حلمك هنا..."
-              />
-
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  if (!dream.trim()) return alert("أدخل حلمك أولاً");
-                  setMode("explain");
-                  askDream(dream);
-                }}
-              >
-                {loading ? "جارٍ التفسير..." : "فسّر الحلم"}
-              </button>
-
-              <button className="btn btn-ghost" onClick={() => setDream("")}>
-                مسح
-              </button>
-            </div>
-          </>
-        )}
-
-        {mode === "explain" && (
-          <>
-            <div className="title">التفسير الصوتي</div>
-
-            <div className="explain-circle">
-              <div className="stop-square" onClick={() => audioRef.current?.pause()}>
-                ⏹
-              </div>
-            </div>
-
-            <div className="reply-box">{reply || "جارٍ تجهيز التفسير..."}</div>
-
-            <button className="btn btn-primary" onClick={() => audioRef.current?.play()}>
-              🔊 إعادة الاستماع
-            </button>
-
-            {audioUrl && (
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '10px' }}>
-                <a href={audioUrl} download="interpretation.mp3" className="btn btn-ghost" style={{ textDecoration: 'none' }}>
-                  📥 تحميل الصوت
-                </a>
-                {navigator.share && (
-                  <button className="btn btn-ghost" onClick={handleShare}>
-                    🔗 مشاركة
-                  </button>
-                )}
+          <div className="mic-container fade-in">
+            {recording && (
+              <div className="visualizer">
+                <div className="bar" style={{ animationDelay: "0s" }}></div>
+                <div className="bar" style={{ animationDelay: "0.2s" }}></div>
+                <div className="bar" style={{ animationDelay: "0.4s" }}></div>
+                <div className="bar" style={{ animationDelay: "0.1s" }}></div>
+                <div className="bar" style={{ animationDelay: "0.3s" }}></div>
               </div>
             )}
 
-            <button
-              className="btn btn-ghost"
-              onClick={() => {
-                audioRef.current?.pause();
-                setMode("record");
-                setReply("");
-                setAudioUrl(""); // Reset audio URL
-              }}
-            >
-              حلم جديد
-            </button>
-          </>
+            <div className="mic-wrap">
+              {recording && <div className="pulse-ring"></div>}
+              {recording && <div className="pulse-ring" style={{ animationDelay: "1s" }}></div>}
+              <div
+                className={`mic-circle ${recording ? "recording" : ""}`}
+                onClick={() => (recording ? stopRecording() : startRecording())}
+              >
+                {recording ? "⏹" : "🎙️"}
+              </div>
+            </div>
+
+            <div style={{ color: "var(--text-sub)", marginTop: "20px" }}>
+              {recording ? "جارٍ الاستماع..." : "اضغط وتحدث"}
+            </div>
+
+            {/* Optional Text Input Trigger */}
+            <div style={{ marginTop: '40px' }}>
+              <button
+                className="btn btn-ghost" style={{ fontSize: "14px", padding: "8px 16px" }}
+                onClick={() => setMode("text")}
+              >
+                📥 كتابة الحلم يدوياً
+              </button>
+            </div>
+
+            {/* PWA Install Button */}
+            {!isInstalled && (
+              <button className="btn btn-primary" onClick={handleInstall} style={{ marginTop: '10px' }}>
+                📱 تثبيت التطبيق
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* === Text Mode === */}
+        {mode === "text" && (
+          <div className="fade-in">
+            <div style={{ marginTop: "20px", textAlign: "center" }}>
+              <textarea
+                value={manualText}
+                onChange={(e) => setManualText(e.target.value)}
+                placeholder="اكتب حلمك هنا..."
+                style={{
+                  width: "100%",
+                  maxWidth: "500px",
+                  height: "150px",
+                  padding: "15px",
+                  borderRadius: "20px",
+                  border: "1px solid var(--glass-border)",
+                  background: "var(--glass-bg)",
+                  color: "var(--text-main)",
+                  fontSize: "16px",
+                  fontFamily: "inherit",
+                  resize: "vertical",
+                  outline: "none",
+                  direction: "rtl"
+                }}
+              />
+              <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginTop: "20px" }}>
+                <button className="btn btn-primary" onClick={handleSubmitText}>
+                  تفسير الحلم
+                </button>
+                <button className="btn btn-ghost" onClick={() => setMode("record")}>
+                  إلغاء
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* === Explain Mode === */}
+        {mode === "explain" && (
+          <div className="fade-in">
+            {loading ? (
+              <div style={{ padding: "40px" }}>
+                <div style={{ width: "50px", height: "50px", border: "4px solid #fff3", borderTopColor: "var(--accent-gold)", borderRadius: "50%", margin: "0 auto" }} className="spin"></div>
+                <div style={{ marginTop: "20px", color: "var(--accent-gold)" }}>يتم الآن التفسير...</div>
+              </div>
+            ) : (
+              <>
+                {audioSrc && (
+                  <div style={{ margin: "20px 0" }}>
+                    <audio controls autoPlay src={audioSrc} style={{ width: "100%", height: "40px", borderRadius: "20px" }} />
+                    {/* Playback Visualizer */}
+                    <div className="visualizer" style={{ marginTop: "10px", height: "20px" }}>
+                      <div className="bar"></div><div className="bar"></div><div className="bar"></div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="reply-box">{replyText}</div>
+                {dreamText && <div className="dream-quote">"{dreamText}"</div>}
+
+                <div style={{ display: "flex", gap: "10px", justifyContent: "center", marginTop: "25px" }}>
+                  <button className="btn btn-primary" onClick={() => setMode("record")}>تسجيل آخر</button>
+                </div>
+              </>
+            )}
+          </div>
         )}
 
       </div>
