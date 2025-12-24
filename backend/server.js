@@ -40,7 +40,7 @@ app.use(helmetConfig);
 // CORS configuration with origin validation
 const allowedOrigins = process.env.ALLOWED_ORIGINS 
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:4173'];
+  : ['https://www.ahlamok.com/', 'https://www.ahlamok.com/', 'https://www.ahlamok.com/'];
 
 app.use(cors({
   origin: (origin, callback) => {
