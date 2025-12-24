@@ -4,131 +4,371 @@ import cors from "cors";
 import OpenAI from "openai";
 import multer from "multer";
 import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// Security middleware
+import {
+  helmetConfig,
+  generalLimiter,
+  apiLimiter,
+  audioUploadLimiter,
+  validateOrigin,
+  validateRequestSize,
+  errorHandler
+} from "./middleware/security.js";
+
+// Validation middleware
+import {
+  validateDreamText,
+  validateAudioFile,
+  checkValidation,
+  sanitizeFilename,
+  sanitizeText
+} from "./middleware/validation.js";
 
 dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
-app.use(cors());
-app.use(express.json());
 
-const upload = multer({ storage: multer.memoryStorage() });
-const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Security: Helmet for security headers
+app.use(helmetConfig);
 
-// System prompt فقط لـ GPT
-const systemPrompt = `
-أنت خبير في تفسير الأحلام على منهج ابن سيرين والنابلسي.
-افهم جميع اللهجات العربية (مغربية، مصرية، خليجية، شامية…).
-رد بالعربية الفصحى، مختصر، نبرة هادئة وهادية.
-صوت رجل هادئ وحكيم
-إذا الكلام ليس حلم واضح، قل: "لم أستطع تحديد حلم واضح لتفسيره."
-`;
+// CORS configuration with origin validation
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(',')
+  : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:4173'];
 
-// تحويل الصوت لنص
-async function transcribeAudio(buffer, originalName) {
-  const tempPath = `./temp-${Date.now()}-${originalName}`;
-  fs.writeFileSync(tempPath, buffer);
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests) in development
+    if (!origin && process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    
+    if (origin && allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else if (!origin && process.env.NODE_ENV === 'production') {
+      callback(new Error('Not allowed by CORS'));
+    } else {
+      callback(null, true); // Allow in development
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+  maxAge: 86400 // 24 hours
+}));
 
-  const transcription = await client.audio.transcriptions.create({
-    file: fs.createReadStream(tempPath),
-    model: "whisper-1",
-    language: "ar"
-  });
+// Body parser with size limits
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  fs.unlinkSync(tempPath);
-  return transcription.text;
+// Apply general rate limiting
+app.use(generalLimiter);
+
+// Validate API key exists
+if (!process.env.OPENAI_API_KEY) {
+  console.error('❌ ERROR: OPENAI_API_KEY is not set in environment variables!');
+  process.exit(1);
 }
 
-// Endpoint for audio
-app.post("/dream-audio", upload.single("audio"), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: "لم يتم إرسال ملف صوتي" });
+const client = new OpenAI({ 
+  apiKey: process.env.OPENAI_API_KEY,
+  maxRetries: 3,
+  timeout: 30000 // 30 seconds timeout
+});
 
-    // 1️⃣ تحويل الصوت لنص
-    const userText = await transcribeAudio(req.file.buffer, req.file.originalname);
-
-    if (!userText || userText.trim().length < 2) {
-      return res.json({
-        inputText: userText,
-        replyText: "لم أسمع شيئاً واضحاً. الرجاء المحاولة مرة أخرى.",
-        audioBase64: null
-      });
+// Multer configuration with file size limit
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB max
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimeTypes = [
+      'audio/webm',
+      'audio/mp3',
+      'audio/mpeg',
+      'audio/wav',
+      'audio/ogg',
+      'audio/m4a',
+      'audio/x-m4a',
+    ];
+    
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('نوع الملف غير مدعوم'), false);
     }
-
-    // 2️⃣ GPT: تفسير الحلم فقط
-    const gptResponse = await client.chat.completions.create({
-      model: "gpt-4-turbo",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userText }
-      ],
-      temperature: 0.7
-    });
-
-    const replyText = gptResponse.choices[0].message.content.trim();
-
-    // 3️⃣ TTS: فقط الرد النهائي، بدون أي تعليمات إضافية
-    const ttsResponse = await client.audio.speech.create({
-      model: "gpt-4o-mini-tts",
-      voice: "alloy", // صوت رجل هادئ وحكيم
-      input: replyText,
-      language: "ar"
-    });
-
-    const bufferTTS = Buffer.from(await ttsResponse.arrayBuffer());
-    const audioBase64 = bufferTTS.toString("base64");
-
-    res.json({ inputText: userText, replyText, audioBase64 });
-
-  } catch (err) {
-    console.error("❌ Error processing dream:", err);
-    res.status(500).json({ error: "حدث خطأ أثناء المعالجة" });
   }
 });
 
-// Endpoint for text
-app.post("/dream-text", async (req, res) => {
+// System prompt فقط لـ GPT
+const systemPrompt = `
+أنت مفسر أحلام حكيم، تتبع المنهج المعروف في تفسير الأحلام عند علماء السلف،
+وتعتمد الدلالات المشهورة للرموز، دون ذكر أسماء أو كتب.
+
+تتحدث بصوت هادئ، رزين، مطمئن،
+وكأنك شيخ ناصح يحدّث شخصاً على انفراد.
+
+❗ أسلوب الكلام:
+- العربية الفصحى السهلة.
+- جُمل قصيرة ومتزنة.
+- نبرة وقورة هادئة.
+- توقفات طبيعية بين الجمل.
+- عبارات قليلة ولكن معبّرة.
+
+❗ منهج التفسير:
+- فسّر الرؤيا بهدوء وتأنٍ.
+- اربط المعنى بسياق الحلم وحال الرائي إن ظهر.
+- لا تجزم بالغيب.
+- قدّم المعنى على أنه اجتهاد وتوجيه.
+
+❗ التزم بما يلي:
+- لا تذكر أسماء علماء أو مصادر.
+- لا تستخدم أسلوب الخطابة أو الوعظ.
+- لا تُطِل في الشرح.
+
+اختم التفسير دائماً بعبارة:
+"والله أعلم، واسأل الله الخير"
+
+إذا لم تتضح الرؤيا، قل فقط:
+"لم تتضح الرؤيا بما يكفي لتفسيرها."
+
+`;
+
+
+function humanizeText(text) {
+  return `${text.replace(/\./g, "…")}`;
+}
+
+// تحويل الصوت لنص مع حماية إضافية
+async function transcribeAudio(buffer, originalName) {
+  // Sanitize filename
+  const safeFilename = sanitizeFilename(originalName);
+  const tempPath = path.join(__dirname, 'temp', `temp-${Date.now()}-${safeFilename}`);
+  
+  // Ensure temp directory exists
+  const tempDir = path.join(__dirname, 'temp');
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+
   try {
-    const { text } = req.body;
-    if (!text || text.trim().length < 2) {
-      return res.json({
-        inputText: text,
-        replyText: "لم أستطع تحديد حلم واضح لتفسيره.",
-        audioBase64: null
-      });
-    }
+    fs.writeFileSync(tempPath, buffer);
 
-    // GPT: تفسير الحلم فقط
-    const gptResponse = await client.chat.completions.create({
-      model: "gpt-4-turbo",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: text }
-      ],
-      temperature: 0.7
-    });
-
-    const replyText = gptResponse.choices[0].message.content.trim();
-
-    // TTS: فقط الرد النهائي
-    const ttsResponse = await client.audio.speech.create({
-      model: "gpt-4o-mini-tts",
-      voice: "alloy",
-      input: replyText,
+    const transcription = await client.audio.transcriptions.create({
+      file: fs.createReadStream(tempPath),
+      model: "whisper-1",
       language: "ar"
     });
 
-    const bufferTTS = Buffer.from(await ttsResponse.arrayBuffer());
-    const audioBase64 = bufferTTS.toString("base64");
+    // Clean up temp file
+    if (fs.existsSync(tempPath)) {
+      fs.unlinkSync(tempPath);
+    }
 
-    res.json({ inputText: text, replyText, audioBase64 });
-
-  } catch (err) {
-    console.error("❌ Error processing dream text:", err);
-    res.status(500).json({ error: "حدث خطأ أثناء المعالجة" });
+    // Sanitize transcription result
+    return sanitizeText(transcription.text);
+  } catch (error) {
+    // Clean up temp file on error
+    if (fs.existsSync(tempPath)) {
+      fs.unlinkSync(tempPath);
+    }
+    throw error;
   }
+}
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ 
+    status: "ok", 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Endpoint for audio with security middleware
+app.post(
+  "/dream-audio",
+  audioUploadLimiter, // Strict rate limiting for audio uploads
+  validateRequestSize(10), // Max 10MB
+  upload.single("audio"),
+  validateAudioFile, // Validate file type and size
+  async (req, res, next) => {
+    try {
+      // 1️⃣ تحويل الصوت لنص
+      const userText = await transcribeAudio(req.file.buffer, req.file.originalname);
+
+      if (!userText || userText.trim().length < 2) {
+        return res.json({
+          inputText: userText,
+          replyText: "لم أسمع شيئاً واضحاً. الرجاء المحاولة مرة أخرى.",
+          audioBase64: null
+        });
+      }
+
+      // Validate text length
+      if (userText.length > 5000) {
+        return res.status(400).json({
+          error: "النص طويل جداً. الحد الأقصى: 5000 حرف",
+          code: "TEXT_TOO_LONG"
+        });
+      }
+
+      // 2️⃣ GPT: تفسير الحلم فقط
+      const gptResponse = await client.chat.completions.create({
+        model: "gpt-4-turbo",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userText }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000 // Limit response length
+      });
+
+      const rawReply = gptResponse.choices[0].message.content.trim();
+      const replyText = sanitizeText(humanizeText(rawReply));
+
+      // 3️⃣ TTS: فقط الرد النهائي، بدون أي تعليمات إضافية
+      const ttsResponse = await client.audio.speech.create({
+        model: "tts-1",
+        voice: "alloy", // صوت رجل هادئ وحكيم
+        input: replyText.substring(0, 4000), // Limit TTS input
+      });
+
+      const bufferTTS = Buffer.from(await ttsResponse.arrayBuffer());
+      const audioBase64 = bufferTTS.toString("base64");
+
+      res.json({ 
+        inputText: userText, 
+        replyText, 
+        audioBase64 
+      });
+
+    } catch (err) {
+      console.error("❌ Error processing dream:", err);
+      
+      // Don't expose internal errors
+      if (err.status === 401 || err.status === 403) {
+        return res.status(err.status).json({
+          error: "خطأ في المصادقة",
+          code: "AUTH_ERROR"
+        });
+      }
+
+      if (err.status === 429) {
+        return res.status(429).json({
+          error: "تم تجاوز الحد المسموح. يرجى المحاولة لاحقاً",
+          code: "RATE_LIMIT_EXCEEDED"
+        });
+      }
+
+      next(err); // Pass to error handler
+    }
+  }
+);
+
+// Endpoint for text with security middleware
+app.post(
+  "/dream-text",
+  apiLimiter, // Rate limiting for API calls
+  validateRequestSize(1), // Max 1MB for text
+  validateDreamText, // Input validation
+  checkValidation, // Check validation results
+  async (req, res, next) => {
+    try {
+      const { text } = req.body;
+      
+      // Additional validation (already done by middleware, but double-check)
+      if (!text || text.trim().length < 2) {
+        return res.json({
+          inputText: text,
+          replyText: "لم أستطع تحديد حلم واضح لتفسيره.",
+          audioBase64: null
+        });
+      }
+
+      // GPT: تفسير الحلم فقط
+      const gptResponse = await client.chat.completions.create({
+        model: "gpt-4-turbo",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: text }
+        ],
+        temperature: 0.7,
+        max_tokens: 1000 // Limit response length
+      });
+
+      const rawReply = gptResponse.choices[0].message.content.trim();
+      const replyText = sanitizeText(humanizeText(rawReply));
+
+      // TTS: فقط الرد النهائي
+      const ttsResponse = await client.audio.speech.create({
+        model: "tts-1",
+        voice: "alloy",
+        input: replyText.substring(0, 4000), // Limit TTS input
+      });
+
+      const bufferTTS = Buffer.from(await ttsResponse.arrayBuffer());
+      const audioBase64 = bufferTTS.toString("base64");
+
+      res.json({ 
+        inputText: text, 
+        replyText, 
+        audioBase64 
+      });
+
+    } catch (err) {
+      console.error("❌ Error processing dream text:", err);
+      
+      // Don't expose internal errors
+      if (err.status === 401 || err.status === 403) {
+        return res.status(err.status).json({
+          error: "خطأ في المصادقة",
+          code: "AUTH_ERROR"
+        });
+      }
+
+      if (err.status === 429) {
+        return res.status(429).json({
+          error: "تم تجاوز الحد المسموح. يرجى المحاولة لاحقاً",
+          code: "RATE_LIMIT_EXCEEDED"
+        });
+      }
+
+      next(err); // Pass to error handler
+    }
+  }
+);
+
+// Error handler (must be last)
+app.use(errorHandler);
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    error: "المسار غير موجود",
+    code: "NOT_FOUND"
+  });
 });
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🔒 Security features enabled`);
+  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+  
+  // Security warnings
+  if (!process.env.OPENAI_API_KEY) {
+    console.warn('⚠️  WARNING: OPENAI_API_KEY not set!');
+  }
+  
+  if (process.env.NODE_ENV === 'production' && !process.env.ALLOWED_ORIGINS) {
+    console.warn('⚠️  WARNING: ALLOWED_ORIGINS not set in production!');
+  }
 });
