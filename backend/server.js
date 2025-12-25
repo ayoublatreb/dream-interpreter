@@ -59,7 +59,7 @@ app.use(cors({
   maxAge: 86400
 }));
 
-app.options('/*', cors({ origin: true, credentials: true }));
+
 
 
 // Body parser with size limits
