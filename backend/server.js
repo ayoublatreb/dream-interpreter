@@ -38,7 +38,6 @@ const app = express();
 app.use(helmetConfig);
 
 // CORS configuration with origin validation
-// ===== CORS FIX (SAFE + PRODUCTION READY) =====
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
   : [
@@ -50,30 +49,18 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
 
 app.use(cors({
   origin: (origin, callback) => {
-    // ✅ السماح بالطلبات بدون origin (PWA, audio, mobile)
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-
-    console.error('❌ CORS blocked:', origin);
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type',
-    'Authorization',
-    'X-API-Key'
-  ],
+  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','X-API-Key'],
   maxAge: 86400
 }));
 
+app.options('/*', cors({ origin: true, credentials: true }));
 
-app.options('*', cors());
 
 // Body parser with size limits
 app.use(express.json({ limit: '10mb' }));
