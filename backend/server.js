@@ -47,17 +47,18 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
       'https://www.ahlamok.com'
     ];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET','POST','PUT','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','X-API-Key'],
-  maxAge: 86400
-}));
+    app.use(cors({
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true); // السماح بدون origin (PWA, mobile)
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error('Not allowed by CORS'));
+      },
+      credentials: true,
+      methods: ['GET','POST','PUT','DELETE','OPTIONS'],
+      allowedHeaders: ['Content-Type','Authorization','X-API-Key'],
+      maxAge: 86400
+    }));
+    
 
 
 
