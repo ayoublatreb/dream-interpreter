@@ -38,9 +38,9 @@ const app = express();
 app.use(helmetConfig);
 
 // CORS configuration with origin validation
-const allowedOrigins = process.env.ALLOWED_ORIGINS 
+const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
-  : ['https://www.ahlamok.com/', 'https://www.ahlamok.com/', 'https://www.ahlamok.com/'];
+  : ['http://localhost:5173', 'http://localhost:3001', 'http://localhost:4173', 'https://www.ahlamok.com', 'https://ahlamok.com'];
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -48,7 +48,7 @@ app.use(cors({
     if (!origin && process.env.NODE_ENV !== 'production') {
       return callback(null, true);
     }
-    
+
     if (origin && allowedOrigins.includes(origin)) {
       callback(null, true);
     } else if (!origin && process.env.NODE_ENV === 'production') {
@@ -76,14 +76,14 @@ if (!process.env.OPENAI_API_KEY) {
   process.exit(1);
 }
 
-const client = new OpenAI({ 
+const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   maxRetries: 3,
   timeout: 30000 // 30 seconds timeout
 });
 
 // Multer configuration with file size limit
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB max
@@ -98,7 +98,7 @@ const upload = multer({
       'audio/m4a',
       'audio/x-m4a',
     ];
-    
+
     if (allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -151,7 +151,7 @@ async function transcribeAudio(buffer, originalName) {
   // Sanitize filename
   const safeFilename = sanitizeFilename(originalName);
   const tempPath = path.join(__dirname, 'temp', `temp-${Date.now()}-${safeFilename}`);
-  
+
   // Ensure temp directory exists
   const tempDir = path.join(__dirname, 'temp');
   if (!fs.existsSync(tempDir)) {
@@ -185,8 +185,8 @@ async function transcribeAudio(buffer, originalName) {
 
 // Health check endpoint
 app.get("/health", (req, res) => {
-  res.json({ 
-    status: "ok", 
+  res.json({
+    status: "ok",
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
@@ -244,15 +244,15 @@ app.post(
       const bufferTTS = Buffer.from(await ttsResponse.arrayBuffer());
       const audioBase64 = bufferTTS.toString("base64");
 
-      res.json({ 
-        inputText: userText, 
-        replyText, 
-        audioBase64 
+      res.json({
+        inputText: userText,
+        replyText,
+        audioBase64
       });
 
     } catch (err) {
       console.error("❌ Error processing dream:", err);
-      
+
       // Don't expose internal errors
       if (err.status === 401 || err.status === 403) {
         return res.status(err.status).json({
@@ -283,7 +283,7 @@ app.post(
   async (req, res, next) => {
     try {
       const { text } = req.body;
-      
+
       // Additional validation (already done by middleware, but double-check)
       if (!text || text.trim().length < 2) {
         return res.json({
@@ -317,15 +317,15 @@ app.post(
       const bufferTTS = Buffer.from(await ttsResponse.arrayBuffer());
       const audioBase64 = bufferTTS.toString("base64");
 
-      res.json({ 
-        inputText: text, 
-        replyText, 
-        audioBase64 
+      res.json({
+        inputText: text,
+        replyText,
+        audioBase64
       });
 
     } catch (err) {
       console.error("❌ Error processing dream text:", err);
-      
+
       // Don't expose internal errors
       if (err.status === 401 || err.status === 403) {
         return res.status(err.status).json({
@@ -362,12 +362,12 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   console.log(`🔒 Security features enabled`);
   console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-  
+
   // Security warnings
   if (!process.env.OPENAI_API_KEY) {
     console.warn('⚠️  WARNING: OPENAI_API_KEY not set!');
   }
-  
+
   if (process.env.NODE_ENV === 'production' && !process.env.ALLOWED_ORIGINS) {
     console.warn('⚠️  WARNING: ALLOWED_ORIGINS not set in production!');
   }

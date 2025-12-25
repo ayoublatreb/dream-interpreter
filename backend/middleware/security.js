@@ -77,9 +77,9 @@ export const validateApiKey = (req, res, next) => {
 
 // Origin validation middleware
 export const validateOrigin = (req, res, next) => {
-  const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',')
-    : ['http://localhost:5173', 'http://localhost:3000'];
+    : ['http://localhost:5173', 'http://localhost:3000', 'https://www.ahlamok.com', 'https://ahlamok.com'];
 
   const origin = req.headers.origin;
 
