@@ -1,0 +1,6 @@
+{
+  "appId": "com.example.app",
+  "appName": "dream-interpreter",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
