@@ -193,10 +193,40 @@ app.get("/health", (req, res) => {
   });
 });
 
+
+const limits = {};
+
+function dailyLimit(req, res, next) {
+  const key = req.ip;
+  const now = Date.now();
+
+  if (!limits[key]) {
+    limits[key] = { count: 1, time: now };
+    return next();
+  }
+
+  const hours = (now - limits[key].time) / 3600000;
+
+  if (hours >= 24) {
+    limits[key] = { count: 1, time: now };
+    return next();
+  }
+
+  if (limits[key].count >= 3) {
+    return res.status(429).json({
+      error: "لقد استعملت الحد اليومي. انتظر 24 ساعة."
+    });
+  }
+
+  limits[key].count++;
+  next();
+}
+
+
 // Endpoint for audio with security middleware
 app.post(
   "/dream-audio",
-  audioUploadLimiter, // Strict rate limiting for audio uploads
+  audioUploadLimiter,dailyLimit, // Strict rate limiting for audio uploads
   validateRequestSize(10), // Max 10MB
   upload.single("audio"),
   validateAudioFile, // Validate file type and size
@@ -276,7 +306,7 @@ app.post(
 
 // Endpoint for text with security middleware
 app.post(
-  "/dream-text",
+  "/dream-text",dailyLimit, // Strict rate limiting for text uploads
   apiLimiter, // Rate limiting for API calls
   validateRequestSize(1), // Max 1MB for text
   validateDreamText, // Input validation

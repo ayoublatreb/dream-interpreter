@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import axios from "axios";
 import Footer from './components/Footer'
 import BackgroundCanvas from './components/BackgroundCanvas';
+import Navbar from './components/Navbar';
 import soundEffects from './utils/soundEffects';
 import './App.css';
 
@@ -16,7 +17,6 @@ export default function DreamInterpreterApp() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [showTypewriter, setShowTypewriter] = useState(false);
 
   // Data
   const [dreamText, setDreamText] = useState("");
@@ -152,7 +152,6 @@ export default function DreamInterpreterApp() {
         setDreamText(inputText);
         setReplyText(replyText);
         if (audioBase64) setAudioSrc(`data:audio/mp3;base64,${audioBase64}`);
-        setShowTypewriter(true);
       }, 300);
     } catch (error) {
       if (error.response && error.response.status === 429) {
@@ -200,7 +199,6 @@ export default function DreamInterpreterApp() {
         setDreamText(inputText);
         setReplyText(replyText);
         if (audioBase64) setAudioSrc(`data:audio/mp3;base64,${audioBase64}`);
-        setShowTypewriter(true);
         soundEffects.playSuccess();
       }, 300);
     } catch (error) {
@@ -295,8 +293,9 @@ export default function DreamInterpreterApp() {
 
   return (
     <>
+      <Navbar />
       <BackgroundCanvas />
-      <div className="container">
+      <div className="container" style={{ paddingTop: '90px' }}>
         <div className="card fade-in">
           {/* Header */}
           <div className="header-section">
@@ -664,7 +663,6 @@ export default function DreamInterpreterApp() {
                         setDreamText("");
                         setAudioSrc(null);
                         setManualText("");
-                        setShowTypewriter(false);
                       }}
                     >
                       🎙️ تسجيل حلم جديد
@@ -679,7 +677,6 @@ export default function DreamInterpreterApp() {
                         setDreamText("");
                         setAudioSrc(null);
                         setManualText("");
-                        setShowTypewriter(false);
                       }}
                     >
                       ✏️ كتابة حلم جديد

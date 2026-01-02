@@ -8,6 +8,8 @@ import App from './App.jsx'
 const Privacy = lazy(() => import('./pages/Privacy'))
 const About = lazy(() => import('./pages/About'))
 const Contact = lazy(() => import('./pages/Contact'))
+const Articles = lazy(() => import('./pages/Articles'))
+const Reviews = lazy(() => import('./pages/Reviews'))
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -32,6 +34,8 @@ createRoot(document.getElementById('root')).render(
           <Route path="/privacy" element={<Privacy/>} />
           <Route path="/about" element={<About/>} />
           <Route path="/contact" element={<Contact/>} />
+          <Route path="/articles" element={<Articles/>} />
+          <Route path="/reviews" element={<Reviews/>} />
         </Routes>
       </Suspense>
     </BrowserRouter>
