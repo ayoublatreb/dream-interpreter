@@ -5,7 +5,7 @@ import helmet from 'helmet';
 // Rate limiting configurations
 export const generalLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
-  max: 3, // Increased for development
+  max: 50, // Increased for development
   message: {
     error: 'تم تجاوز الحد المسموح من الطلبات اليوم. يرجى المحاولة بعد 24 ساعة',
     retryAfter: '24 ساعة'
@@ -17,7 +17,7 @@ export const generalLimiter = rateLimit({
 // Stricter rate limit for API endpoints
 export const apiLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
-  max: 3, // Increased for development
+  max: 50, // Increased for development
   message: {
     error: 'تم تجاوز الحد المسموح من الطلبات اليوم. يرجى المحاولة بعد 24 ساعة',
     retryAfter: '24 ساعة'
@@ -30,7 +30,7 @@ export const apiLimiter = rateLimit({
 // Very strict rate limit for audio uploads
 export const audioUploadLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000, // 24 hour
-  max: 3, // Limit each IP to 10 audio uploads per hour
+  max: 50, // Limit each IP to 10 audio uploads per hour
   message: {
     error: 'تم تجاوز الحد المسموح من الطلبات اليوم. يرجى المحاولة بعد 24 ساعة',
     retryAfter: '24 ساعة'

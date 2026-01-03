@@ -226,7 +226,7 @@ function dailyLimit(req, res, next) {
 // Endpoint for audio with security middleware
 app.post(
   "/dream-audio",
-  audioUploadLimiter,dailyLimit, // Strict rate limiting for audio uploads
+  audioUploadLimiter, dailyLimit, // Strict rate limiting for audio uploads
   validateRequestSize(10), // Max 10MB
   upload.single("audio"),
   validateAudioFile, // Validate file type and size
@@ -306,7 +306,7 @@ app.post(
 
 // Endpoint for text with security middleware
 app.post(
-  "/dream-text",dailyLimit, // Strict rate limiting for text uploads
+  "/dream-text", dailyLimit, // Strict rate limiting for text uploads
   apiLimiter, // Rate limiting for API calls
   validateRequestSize(1), // Max 1MB for text
   validateDreamText, // Input validation
@@ -376,6 +376,62 @@ app.post(
     }
   }
 );
+
+// Endpoint for social sharing (Facebook OG Tags)
+app.get("/share", (req, res) => {
+  try {
+    const { d, i } = req.query;
+
+    // Default content if params are missing
+    const dream = d ? sanitizeText(d) : "تفسير الأحلام";
+    const interpretation = i ? sanitizeText(i) : "احصل على تفسير دقيق لحلمك الآن.";
+
+    // Create simple HTML with dynamic OG tags
+    const html = `
+      <!DOCTYPE html>
+      <html lang="ar" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <title>تفسير حلم: ${dream.substring(0, 50)}...</title>
+        
+        <!-- Facebook Open Graph -->
+        <meta property="og:type" content="article" />
+        <meta property="og:site_name" content="Ahlamok - تفسير الأحلام" />
+        <meta property="og:title" content="💭 حلم: ${dream.substring(0, 60)}..." />
+        <meta property="og:description" content="📖 التفسير: ${interpretation.substring(0, 250)}..." />
+        <meta property="og:image" content="https://www.ahlamok.com/dream-icon.png" />
+        <!-- og:url removed to allow dynamic preview -->
+
+        
+        <!-- Twitter Cards -->
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="💭 حلم: ${dream.substring(0, 60)}..." />
+        <meta name="twitter:description" content="📖 التفسير: ${interpretation.substring(0, 250)}..." />
+        
+        <!-- Redirect to main site after a brief delay so users can see the content if they click -->
+        <meta http-equiv="refresh" content="0; url=https://www.ahlamok.com/" />
+        
+        <style>
+          body { font-family: sans-serif; text-align: center; padding: 50px; background: #f0f2f5; }
+          .loader { font-size: 24px; color: #555; }
+        </style>
+      </head>
+      <body>
+        <div class="loader">جارٍ التوجيه إلى Ahlamok... 🌙</div>
+        <script>
+          // Immediate redirect for actual users (crawlers don't execute JS usually)
+          window.location.href = "https://www.ahlamok.com/";
+        </script>
+      </body>
+      </html>
+    `;
+
+    res.send(html);
+  } catch (error) {
+    console.error("Share endpoint error:", error);
+    res.redirect("https://www.ahlamok.com");
+  }
+});
 
 // Error handler (must be last)
 app.use(errorHandler);

@@ -6,10 +6,7 @@ import Navbar from './components/Navbar';
 import soundEffects from './utils/soundEffects';
 import './App.css';
 
-import SplashScreen from './components/SplashScreen';
-
 export default function DreamInterpreterApp() {
-  const [appReady, setAppReady] = useState(false);
   const [mode, setMode] = useState("record"); // record | explain | text
   const [recording, setRecording] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -30,7 +27,7 @@ export default function DreamInterpreterApp() {
   const loadingIntervalRef = useRef(null);
 
   // API base URL from environment variable
-  //const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+  // const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
   const API_BASE_URL = '/api';
 
 
@@ -254,27 +251,27 @@ export default function DreamInterpreterApp() {
 
   // Share functions - memoized
   const shareOnFacebook = useCallback(async () => {
-    const shareText = dreamText
-      ? `💭 حلمي: "${dreamText}"\n\n📖 التفسير: ${replyText.substring(0, 200)}...\n\n✨ جرب تفسير أحلامك على: ${window.location.origin}`
-      : `📖 تفسير حلمي: ${replyText.substring(0, 200)}...\n\n✨ جرب تفسير أحلامك على: ${window.location.origin}`;
+    // Construct the backend share URL that serves the dynamic OG tags
+    // We trim the content to ensure we don't hit URL length limits too easily
+    const dreamParam = dreamText ? encodeURIComponent(dreamText.substring(0, 300)) : '';
+    const interpParam = replyText ? encodeURIComponent(replyText.substring(0, 1000)) : '';
 
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Ahlamok - تفسير الأحلام',
-          text: shareText,
-          url: window.location.origin,
-        });
-      } catch (error) {
-        console.log('Error sharing:', error);
-      }
-    } else {
-      // Fallback for desktop browsers
-      // Note: Facebook Sharer doesn't support pre-filling text anymore, only URL.
-      const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.origin)}`;
-      window.open(url, '_blank', 'width=600,height=400');
-    }
-  }, [dreamText, replyText]);
+    // The link we want Facebook to crawl is our dynamic backend endpoint
+    // Note: We use API_BASE_URL which points to our backend
+    const backendShareUrl = `${API_BASE_URL}/share?d=${dreamParam}&i=${interpParam}`;
+
+    // Fallback URL construction for localhost
+    const urlToShare = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? `https://www.ahlamok.com/share?d=${dreamParam}&i=${interpParam}`
+      : backendShareUrl;
+
+    const shareText = dreamText
+      ? `💭 حلمي: "${dreamText}"\n\n📖 التفسير: ${replyText}\n\n✨ جرب تفسير أحلامك على: ${window.location.origin}`
+      : `📖 تفسير حلمي: ${replyText}\n\n✨ جرب تفسير أحلامك على: ${window.location.origin}`;
+
+    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(urlToShare)}&quote=${encodeURIComponent(shareText)}`;
+    window.open(url, '_blank', 'width=600,height=400');
+  }, [dreamText, replyText, API_BASE_URL]);
 
 
   const shareOnWhatsApp = useCallback(() => {
@@ -286,10 +283,6 @@ export default function DreamInterpreterApp() {
     const url = `https://wa.me/?text=${encodedText}`;
     window.open(url, '_blank');
   }, [dreamText, replyText]);
-
-  if (!appReady) {
-    return <SplashScreen onComplete={() => setAppReady(true)} />;
-  }
 
   return (
     <>
