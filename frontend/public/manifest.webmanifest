@@ -1,0 +1,83 @@
+{
+  "name": "✨ أحلامك - Ahlamok",
+  "short_name": "أحلامك - Ahlamok",
+  "description": "تطبيق احترافي لتفسير الأحلام باستخدام تقنية الذكاء الاصطناعي. سجل أو اكتب حلمك واحصل على تفسير معمق وسماع الرد صوتياً.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0e27",
+  "theme_color": "#d4af37",
+  "dir": "rtl",
+  "lang": "ar-SA",
+  "categories": ["lifestyle", "wellness"],
+  "icons": [
+    {
+      "src": "/dream-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "تسجيل حلم جديد",
+      "short_name": "تسجيل",
+      "description": "سجل حلمك الجديد بالصوت",
+      "url": "/?mode=record",
+      "icons": [
+        {
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "كتابة حلم",
+      "short_name": "كتابة",
+      "description": "اكتب حلمك نصياً",
+      "url": "/?mode=text",
+      "icons": [
+        {
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "dream_title",
+      "text": "dream_text"
+    }
+  }
+}

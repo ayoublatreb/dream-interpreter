@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="dreamGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#d4af37;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#a78bfa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#60a5fa;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="glowGradient">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <circle cx="100" cy="100" r="95" fill="url(#dreamGradient)" opacity="0.1"/>
+  
+  <!-- Glow Effect -->
+  <circle cx="100" cy="100" r="90" fill="url(#glowGradient)"/>
+
+  <!-- Moon with stars -->
+  <g transform="translate(100, 80)">
+    <!-- Main crescent moon -->
+    <path d="M -30 0 A 30 30 0 0 1 30 0" fill="none" stroke="url(#dreamGradient)" stroke-width="4" stroke-linecap="round"/>
+    
+    <!-- Moon fill with gradient -->
+    <circle cx="0" cy="0" r="28" fill="url(#dreamGradient)" opacity="0.2"/>
+    
+    <!-- Stars -->
+    <circle cx="-40" cy="-25" r="2.5" fill="url(#dreamGradient)"/>
+    <circle cx="-35" cy="-45" r="2" fill="url(#dreamGradient)"/>
+    <circle cx="45" cy="-30" r="2.5" fill="url(#dreamGradient)"/>
+    <circle cx="50" cy="-50" r="2" fill="url(#dreamGradient)"/>
+    
+    <!-- Twinkle animation helper -->
+    <circle cx="-50" cy="-50" r="1.5" fill="url(#dreamGradient)" opacity="0.6"/>
+    <circle cx="60" cy="-55" r="1" fill="url(#dreamGradient)" opacity="0.5"/>
+  </g>
+
+  <!-- Dream waves/clouds -->
+  <g transform="translate(100, 130)" opacity="0.7">
+    <path d="M -45 0 Q -35 -8 -25 0 Q -15 8 -5 0 Q 5 -8 15 0 Q 25 8 35 0 Q 45 -8 55 0" 
+          fill="none" stroke="url(#dreamGradient)" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Decorative circles -->
+  <circle cx="60" cy="60" r="3" fill="url(#dreamGradient)" opacity="0.5"/>
+  <circle cx="140" cy="70" r="2.5" fill="url(#dreamGradient)" opacity="0.4"/>
+  <circle cx="70" cy="140" r="2" fill="url(#dreamGradient)" opacity="0.5"/>
+  <circle cx="130" cy="135" r="2.5" fill="url(#dreamGradient)" opacity="0.4"/>
+
+  <!-- Border ring -->
+  <circle cx="100" cy="100" r="95" fill="none" stroke="url(#dreamGradient)" stroke-width="2" opacity="0.3"/>
+</svg>
