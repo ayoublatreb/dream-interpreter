@@ -300,7 +300,7 @@ function MainContent() {
         // Handle URL construction for absolute paths
         // Facebook MUST have an absolute URL to crawl
         const base = window.location.origin;
-        const urlToShare = `${base}${API_BASE_URL}/share?d=${dreamParam}&i=${interpParam}`;
+        const urlToShare = `${base}/share?d=${dreamParam}&i=${interpParam}`;
 
         const shareText = dreamText
             ? `💭 حلمي: "${dreamText}"\n\n📖 التفسير: ${replyText}\n\n✨ جرب تفسير أحلامك على: ${window.location.origin}`
@@ -308,7 +308,7 @@ function MainContent() {
 
         const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(urlToShare)}&quote=${encodeURIComponent(shareText)}`;
         window.open(url, '_blank', 'width=600,height=400');
-    }, [dreamText, replyText, API_BASE_URL]);
+    }, [dreamText, replyText]);
 
 
     const shareOnWhatsApp = useCallback(() => {
