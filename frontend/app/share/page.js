@@ -1,5 +1,8 @@
 import { redirect } from 'next/navigation';
 
+// Force dynamic rendering since this page uses searchParams
+export const dynamic = 'force-dynamic';
+
 export default function SharePage({ searchParams }) {
   const d = searchParams?.d || '';
   const i = searchParams?.i || '';
