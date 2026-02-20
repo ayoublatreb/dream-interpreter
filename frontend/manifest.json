@@ -1,0 +1,28 @@
+{
+  "name": "تفسير الأحلام",
+  "short_name": "تفسير الأحلام",
+  "description": "أكبر موقع متخصص في تفسير الأحلام والرؤى بالتفصيل مع تفسيرات ابن سيرين ونابلسي وابن شاهين",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/maskable-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

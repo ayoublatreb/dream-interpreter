@@ -1,27 +1,46 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-    reactStrictMode: true,
-  };
+  reactStrictMode: true,
+  trailingSlash: false,
   
-  module.exports = nextConfig;
+  // Image optimization
+  images: {
+    formats: ['image/avif', 'image/webp'],
+  },
   
+  // i18n configuration for Arabic
+  i18n: {
+    locales: ['ar'],
+    defaultLocale: 'ar',
+  },
+  
+  // Headers for SEO and AdSense
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+        ],
+      },
+    ];
+  },
+  
+  // Redirects for SEO
+  async redirects() {
+    return [];
+  },
+};
 
-
-  /* @type {import('next').NextConfig}
-const nextConfig = {
-    reactStrictMode: true,
-    // Ensure we can use the API across different ports/domains if needed
-    async rewrites() {
-        return [
-            {
-                source: '/api/:path*',
-                destination: process.env.NEXT_PUBLIC_API_URL
-                    ? `${process.env.NEXT_PUBLIC_API_URL}/:path*`
-                    : 'http://localhost:3001/:path*',
-            },
-        ]
-    },
-}
-
-module.exports = nextConfig
- */
+module.exports = nextConfig;

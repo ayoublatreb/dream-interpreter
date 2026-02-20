@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --font-family-cairo: 'Cairo', sans-serif;
+}
+
+* {
+  font-family: 'Cairo', sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
