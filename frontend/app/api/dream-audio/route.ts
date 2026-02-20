@@ -6,11 +6,16 @@ export async function POST(request: NextRequest) {
     const { text } = body;
 
     if (!text) {
-      return NextResponse.json({ error: 'النص مطلوب' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'النص مطلوب' },
+        { status: 400 }
+      );
     }
 
-    // Forward request to backend server
-    const response = await fetch(`/api/dream-text`, {
+    // 👇 استعمل الدومين 
+    const backendUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.ahlamok.com';
+
+    const response = await fetch(`${backendUrl}/api/dream-text`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -20,15 +25,22 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      return NextResponse.json({ error: 'خطأ من الخادم الخلفي', details: errorData }, { status: response.status });
+      return NextResponse.json(
+        { error: 'خطأ من الخادم الخلفي', details: errorData },
+        { status: response.status }
+      );
     }
 
     const data = await response.json();
     return NextResponse.json(data);
+
   } catch (error) {
-    console.error('Error in dream-text API:', error);
+    console.error('Error in dream-audio API:', error);
     return NextResponse.json(
-      { error: 'حدث خطأ في الخادم', replyText: 'عذراً، حدث خطأ في تفسير حلمك. يرجى المحاولة مرة أخرى.' },
+      {
+        error: 'حدث خطأ في الخادم',
+        replyText: 'عذراً، حدث خطأ في تفسير حلمك. يرجى المحاولة مرة أخرى.'
+      },
       { status: 500 }
     );
   }
