@@ -42,26 +42,25 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:4173', 'https://www.ahlamok.com', 'https://ahlamok.com'];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests) in development
-    if (!origin && process.env.NODE_ENV !== 'production') {
-      return callback(null, true);
-    }
-
-    if (origin && allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else if (!origin && process.env.NODE_ENV === 'production') {
-      callback(new Error('Not allowed by CORS'));
-    } else {
-      callback(null, true); // Allow in development
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
-  maxAge: 86400 // 24 hours
-}));
+  app.use(cors({
+    origin: (origin, callback) => {
+  
+      // السماح لطلبات السيرفر الداخلي (nginx proxy)
+      if (!origin) {
+        return callback(null, true);
+      }
+  
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+  
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    maxAge: 86400
+  }));
 
 // Body parser with size limits
 app.use(express.json({ limit: '10mb' }));
