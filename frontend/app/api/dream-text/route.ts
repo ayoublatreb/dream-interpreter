@@ -6,17 +6,13 @@ export async function POST(request: NextRequest) {
     const { text } = body;
 
     if (!text) {
-      return NextResponse.json(
-        { error: 'النص مطلوب' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'النص مطلوب' }, { status: 400 });
     }
 
-    // Forward request to backend server
+    // ⚡ استخدم backend مباشر
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
-    
+
     const response = await fetch(`${backendUrl}/dream-text`, {
-      
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -24,13 +20,19 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({ text }),
     });
 
-    const data = await response.json();
-    
-    return NextResponse.json(data);
+    const textData = await response.text(); // نص عادي أولاً
+    let data;
+    try {
+      data = JSON.parse(textData); // حاول تحويله لـ JSON
+    } catch {
+      data = { error: 'رد من backend ليس JSON', raw: textData };
+    }
+
+    return NextResponse.json(data, { status: response.ok ? 200 : response.status });
   } catch (error) {
     console.error('Error in dream-text API:', error);
     return NextResponse.json(
-      { error: 'حدث خطأ في الخادم', replyText: 'عذراً، حدث خطأ في تفسير حلمك. يرجى المحاولة مرة أخرى.' },
+      { error: 'حدث خطأ في الخادم', replyText: 'عذراً، حدث خطأ في تفسير حلمك.' },
       { status: 500 }
     );
   }
