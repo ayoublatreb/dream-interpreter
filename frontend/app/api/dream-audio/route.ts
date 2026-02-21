@@ -11,7 +11,8 @@ export async function POST(request: NextRequest) {
 
  
      // Forward request to backend server
-     const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+      // ⚡ استخدم backend مباشر
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
     const response = await fetch(`${backendUrl}/dream-audio`, {
       method: 'POST',
       headers: {
