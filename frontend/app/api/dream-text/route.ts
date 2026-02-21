@@ -13,10 +13,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward request to backend server
-    //const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
     
-    //const response = await fetch(`${backendUrl}/dream-text`, {
-      const response = await fetch(`/api/dream-text`, {
+    const response = await fetch(`${backendUrl}/dream-text`, {
+      
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

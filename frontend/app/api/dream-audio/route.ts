@@ -9,8 +9,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'النص مطلوب' }, { status: 400 });
     }
 
-    // Forward request to backend server
-    const response = await fetch(`/api/dream-audio`, {
+ 
+     // Forward request to backend server
+     const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+    const response = await fetch(`${backendUrl}/dream-audio`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
