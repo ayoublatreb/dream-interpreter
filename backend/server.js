@@ -47,29 +47,8 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
      'https://ahlamok.com'];
 
      app.use(cors({
-      origin: (origin, callback) => {
-    
-        // السماح للطلبات الداخلية (nginx, curl, server-to-server)
-        if (!origin) {
-          return callback(null, true);
-        }
-    
-        // توحيد البروتوكول لتجنب مشاكل http/https
-        const normalizedOrigin = origin.replace(/\/$/, '');
-    
-        if (allowedOrigins.includes(normalizedOrigin)) {
-          return callback(null, true);
-        }
-    
-        console.log('❌ Blocked by CORS:', origin);
-        return callback(new Error('Not allowed by CORS'));
-    
-      },
-      credentials: true,
-      methods: ['GET', 'POST', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
-      optionsSuccessStatus: 200,
-      maxAge: 86400
+      origin: true,
+      credentials: true
     }));
 
 // Body parser with size limits
