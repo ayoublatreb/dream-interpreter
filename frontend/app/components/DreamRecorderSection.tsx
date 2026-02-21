@@ -49,7 +49,7 @@ export default function DreamRecorderSection() {
     setAudioUrl(null);
     
     try {
-      const response = await fetch('/dream-text', {
+      const response = await fetch('/api/dream-text', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -133,7 +133,7 @@ export default function DreamRecorderSection() {
       const formData = new FormData();
       formData.append('audio', base64Audio);
       
-      const response = await fetch('/dream-audio', {
+      const response = await fetch('/api/dream-audio', {
         method: 'POST',
         body: formData,
       });
